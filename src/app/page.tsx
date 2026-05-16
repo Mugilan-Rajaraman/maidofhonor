@@ -9,17 +9,24 @@ const ThreeJSGlobeWithDots = dynamic(() => import('@/components/ThreeJSGlobeWith
 
 export default function Home() {
   const [inputs, setInputs] = useState({ lat1: '40.71', lon1: '-74.00', lat2: '51.50', lon2: '-0.12' });
-  const [route, setRoute] = useState<{ lat1: number, lon1: number, lat2: number, lon2: number } | null>(null);
+  const [routes, setRoutes] = useState<{ lat1: number, lon1: number, lat2: number, lon2: number }[]>([]);
   const [arcHeight, setArcHeight] = useState(0.4);
   const [routeThickness, setRouteThickness] = useState(0.005);
 
   const handleDrawRoute = () => {
-    setRoute({
-      lat1: parseFloat(inputs.lat1),
-      lon1: parseFloat(inputs.lon1),
-      lat2: parseFloat(inputs.lat2),
-      lon2: parseFloat(inputs.lon2)
-    });
+    setRoutes(prev => [
+      ...prev,
+      {
+        lat1: parseFloat(inputs.lat1),
+        lon1: parseFloat(inputs.lon1),
+        lat2: parseFloat(inputs.lat2),
+        lon2: parseFloat(inputs.lon2)
+      }
+    ]);
+  };
+
+  const handleClearRoutes = () => {
+    setRoutes([]);
   };
 
   return (
@@ -67,16 +74,24 @@ export default function Home() {
               onChange={e => setInputs({...inputs, lon2: e.target.value})}
             />
           </div>
-          <button 
-            onClick={handleDrawRoute}
-            className="bg-white text-black font-semibold px-6 py-2 rounded hover:bg-gray-200 transition-colors text-sm"
-          >
-            Draw Route
-          </button>
+          <div className="flex gap-2 ml-2">
+            <button 
+              onClick={handleDrawRoute}
+              className="bg-white text-black font-semibold px-6 py-2 rounded hover:bg-gray-200 transition-colors text-sm"
+            >
+              Draw Route
+            </button>
+            <button 
+              onClick={handleClearRoutes}
+              className="bg-red-500/20 text-red-400 border border-red-500/50 font-semibold px-4 py-2 rounded hover:bg-red-500/30 transition-colors text-sm"
+            >
+              Clear
+            </button>
+          </div>
         </div>
 
         {/* Sliders */}
-        <div className="flex flex-col md:flex-row items-center justify-center gap-6 bg-white/5 p-4 rounded-xl border border-white/10 max-w-fit mx-auto">
+        <div className="flex flex-col md:flex-row flex-wrap items-center justify-center gap-6 bg-white/5 p-4 rounded-xl border border-white/10 max-w-fit mx-auto">
           <div className="flex items-center gap-4">
             <span className="text-white/70 text-sm">Arc Height:</span>
             <input 
@@ -86,7 +101,7 @@ export default function Home() {
               step="0.05"
               value={arcHeight}
               onChange={(e) => setArcHeight(parseFloat(e.target.value))}
-              className="w-32 accent-cyan-400"
+              className="w-24 accent-cyan-400"
             />
             <span className="text-white/70 text-sm w-8">{arcHeight.toFixed(2)}x</span>
           </div>
@@ -100,14 +115,18 @@ export default function Home() {
               step="0.001"
               value={routeThickness}
               onChange={(e) => setRouteThickness(parseFloat(e.target.value))}
-              className="w-32 accent-cyan-400"
+              className="w-24 accent-cyan-400"
             />
-            <span className="text-white/70 text-sm w-8">{routeThickness.toFixed(3)}</span>
+            <span className="text-white/70 text-sm w-10">{routeThickness.toFixed(3)}</span>
           </div>
         </div>
         
         <div className="w-full relative mt-4 p-[1px] rounded-[1.5rem] bg-gradient-to-b from-white/10 to-transparent">
-          <ThreeJSGlobeWithDots route={route} arcHeightMultiplier={arcHeight} routeThickness={routeThickness} />
+          <ThreeJSGlobeWithDots 
+            routes={routes} 
+            arcHeightMultiplier={arcHeight} 
+            routeThickness={routeThickness} 
+          />
         </div>
       </div>
     </main>

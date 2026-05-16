@@ -27,7 +27,7 @@ interface GlobeRoute {
 }
 
 interface GlobeProps {
-  route?: GlobeRoute | null;
+  routes?: GlobeRoute[];
   arcHeightMultiplier?: number;
   routeThickness?: number;
 }
@@ -47,7 +47,7 @@ const SIZE_MAP = {
 };
 
 export default function ThreeJSGlobeWithDots({
-  route,
+  routes = [],
   arcHeightMultiplier = 0.4,
   routeThickness = 0.005
 }: GlobeProps) {
@@ -111,7 +111,7 @@ export default function ThreeJSGlobeWithDots({
 
     // 2. Wireframe sphere (using Icosahedron for the triangular geodesic look)
     const R = 1.3;
-    const sphereGeo = new THREE.IcosahedronGeometry(R, 16);
+    const sphereGeo = new THREE.IcosahedronGeometry(R, 40);
     const sphereMat = new THREE.MeshBasicMaterial({
       wireframe: true,
       opacity: 0.15,
@@ -120,35 +120,6 @@ export default function ThreeJSGlobeWithDots({
     });
     const wireframeSphere = new THREE.Mesh(sphereGeo, sphereMat);
     globeGroup.add(wireframeSphere);
-
-    // 3. Grid lines
-    const gridGroup = new THREE.Group();
-    const gridMat = new THREE.LineBasicMaterial({ color: '#555555', opacity: 0.1, transparent: true });
-
-    // Latitudes
-    for (let lat = -80; lat <= 80; lat += 20) {
-      const phi = (90 - lat) * (Math.PI / 180);
-      const r = R * Math.sin(phi);
-      const y = R * Math.cos(phi);
-      const curve = new THREE.EllipseCurve(0, 0, r, r, 0, 2 * Math.PI, false, 0);
-      const points = curve.getPoints(64);
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      const ellipse = new THREE.Line(geometry, gridMat);
-      ellipse.rotation.x = Math.PI / 2;
-      ellipse.position.y = y;
-      gridGroup.add(ellipse);
-    }
-
-    // Longitudes
-    for (let lon = -180; lon < 180; lon += 20) {
-      const curve = new THREE.EllipseCurve(0, 0, R, R, 0, Math.PI, false, 0);
-      const points = curve.getPoints(64);
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      const halfEllipse = new THREE.Line(geometry, gridMat);
-      halfEllipse.rotation.y = lon * (Math.PI / 180);
-      gridGroup.add(halfEllipse);
-    }
-    globeGroup.add(gridGroup);
 
     // 4. Continent / Country geometry
     fetch('/countries.geojson')
@@ -307,20 +278,21 @@ export default function ThreeJSGlobeWithDots({
   }, []);
 
   // Handle Route Drawing
-  const routeMeshRef = useRef<THREE.Mesh | null>(null);
+  const routeMeshesRef = useRef<THREE.Mesh[]>([]);
 
   useEffect(() => {
     if (!globeGroupRef.current) return;
     const group = globeGroupRef.current;
 
-    if (routeMeshRef.current) {
-      group.remove(routeMeshRef.current);
-      routeMeshRef.current.geometry.dispose();
-      (routeMeshRef.current.material as THREE.Material).dispose();
-      routeMeshRef.current = null;
-    }
+    // Cleanup previous routes
+    routeMeshesRef.current.forEach(mesh => {
+      group.remove(mesh);
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+    });
+    routeMeshesRef.current = [];
 
-    if (!route) return;
+    if (!routes || routes.length === 0) return;
 
     const R = 1.3;
     const getCartesian = (lat: number, lon: number, radius: number) => {
@@ -333,41 +305,41 @@ export default function ThreeJSGlobeWithDots({
       );
     };
 
-    const p1 = getCartesian(route.lat1, route.lon1, R);
-    const p2 = getCartesian(route.lat2, route.lon2, R);
+    routes.forEach(route => {
+      const p1 = getCartesian(route.lat1, route.lon1, R);
+      const p2 = getCartesian(route.lat2, route.lon2, R);
 
-    const distance = p1.distanceTo(p2);
-    // Arc height proportional to distance, customized by the arcHeightMultiplier
-    const arcHeight = distance * arcHeightMultiplier;
+      const distance = p1.distanceTo(p2);
+      const arcHeight = distance * arcHeightMultiplier;
 
-    const points: THREE.Vector3[] = [];
-    const numPoints = 64;
+      const points: THREE.Vector3[] = [];
+      const numPoints = 64;
 
-    for (let i = 0; i <= numPoints; i++) {
-      const t = i / numPoints;
-      const pt = new THREE.Vector3().copy(p1).lerp(p2, t);
-      pt.normalize();
+      for (let i = 0; i <= numPoints; i++) {
+        const t = i / numPoints;
+        const pt = new THREE.Vector3().copy(p1).lerp(p2, t);
+        pt.normalize();
 
-      const currentHeight = R + 0.01 + 0.06 * (4 * t * (1 - t));
-      pt.multiplyScalar(currentHeight);
+        const currentHeight = R + 0.01 + arcHeight * (4 * t * (1 - t));
+        pt.multiplyScalar(currentHeight);
 
-      points.push(pt);
-    }
+        points.push(pt);
+      }
 
-    const curve = new THREE.CatmullRomCurve3(points);
-    // TubeGeometry(path, tubularSegments, radius, radialSegments, closed)
-    const geometry = new THREE.TubeGeometry(curve, 64, 0.003, 8, false);
-    const material = new THREE.MeshBasicMaterial({
-      color: '#1C1C1E',
-      transparent: true,
-      opacity: 0.9,
+      const curve = new THREE.CatmullRomCurve3(points);
+      const geometry = new THREE.TubeGeometry(curve, 64, routeThickness, 8, false);
+      const material = new THREE.MeshBasicMaterial({
+        color: '#ffffff',
+        transparent: true,
+        opacity: 0.9,
+      });
+
+      const routeMesh = new THREE.Mesh(geometry, material);
+      group.add(routeMesh);
+      routeMeshesRef.current.push(routeMesh);
     });
 
-    const routeMesh = new THREE.Mesh(geometry, material);
-    group.add(routeMesh);
-    routeMeshRef.current = routeMesh;
-
-  }, [route]);
+  }, [routes, arcHeightMultiplier, routeThickness]);
 
   // Simulate reactions arriving
   useEffect(() => {
