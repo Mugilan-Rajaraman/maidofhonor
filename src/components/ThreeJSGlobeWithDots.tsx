@@ -150,8 +150,8 @@ export default function ThreeJSGlobeWithDots({
     }
     globeGroup.add(gridGroup);
 
-    // 4. Continent geometry
-    fetch('/continents.json')
+    // 4. Continent / Country geometry
+    fetch('/countries.geojson')
       .then(res => res.json())
       .then(geoJson => {
         const continentMat = new THREE.LineBasicMaterial({ color: '#ffffff', opacity: 0.85, transparent: true });
@@ -358,7 +358,7 @@ export default function ThreeJSGlobeWithDots({
     // TubeGeometry(path, tubularSegments, radius, radialSegments, closed)
     const geometry = new THREE.TubeGeometry(curve, 64, 0.003, 8, false);
     const material = new THREE.MeshBasicMaterial({
-      color: '#ffffff',
+      color: '#1C1C1E',
       transparent: true,
       opacity: 0.9,
     });
