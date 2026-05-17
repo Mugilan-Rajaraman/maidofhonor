@@ -7,22 +7,15 @@ const ThreeJSGlobeWithDots = dynamic(() => import('@/components/ThreeJSGlobeWith
   ssr: false,
 });
 
+import { RoutePlanner, RouteCoordinates } from '@/components/RoutePlanner';
+
 export default function Home() {
-  const [inputs, setInputs] = useState({ lat1: '40.71', lon1: '-74.00', lat2: '51.50', lon2: '-0.12' });
-  const [routes, setRoutes] = useState<{ lat1: number, lon1: number, lat2: number, lon2: number }[]>([]);
+  const [routes, setRoutes] = useState<RouteCoordinates[]>([]);
   const [arcHeight, setArcHeight] = useState(0.4);
   const [routeThickness, setRouteThickness] = useState(0.005);
 
-  const handleDrawRoute = () => {
-    setRoutes(prev => [
-      ...prev,
-      {
-        lat1: parseFloat(inputs.lat1),
-        lon1: parseFloat(inputs.lon1),
-        lat2: parseFloat(inputs.lat2),
-        lon2: parseFloat(inputs.lon2)
-      }
-    ]);
+  const handleDrawRoute = (coords: RouteCoordinates) => {
+    setRoutes(prev => [...prev, coords]);
   };
 
   const handleClearRoutes = () => {
@@ -40,54 +33,8 @@ export default function Home() {
         </p>
 
         {/* Route Controls */}
-        <div className="flex flex-col md:flex-row items-center justify-center gap-4 bg-white/5 p-4 rounded-xl border border-white/10 max-w-fit mx-auto">
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="Lat 1" 
-              className="bg-black/50 text-white border border-white/20 rounded px-3 py-2 w-24 text-sm focus:outline-none focus:border-white/50"
-              value={inputs.lat1}
-              onChange={e => setInputs({...inputs, lat1: e.target.value})}
-            />
-            <input 
-              type="text" 
-              placeholder="Lon 1" 
-              className="bg-black/50 text-white border border-white/20 rounded px-3 py-2 w-24 text-sm focus:outline-none focus:border-white/50"
-              value={inputs.lon1}
-              onChange={e => setInputs({...inputs, lon1: e.target.value})}
-            />
-          </div>
-          <div className="text-white/50 text-sm font-medium">TO</div>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="Lat 2" 
-              className="bg-black/50 text-white border border-white/20 rounded px-3 py-2 w-24 text-sm focus:outline-none focus:border-white/50"
-              value={inputs.lat2}
-              onChange={e => setInputs({...inputs, lat2: e.target.value})}
-            />
-            <input 
-              type="text" 
-              placeholder="Lon 2" 
-              className="bg-black/50 text-white border border-white/20 rounded px-3 py-2 w-24 text-sm focus:outline-none focus:border-white/50"
-              value={inputs.lon2}
-              onChange={e => setInputs({...inputs, lon2: e.target.value})}
-            />
-          </div>
-          <div className="flex gap-2 ml-2">
-            <button 
-              onClick={handleDrawRoute}
-              className="bg-white text-black font-semibold px-6 py-2 rounded hover:bg-gray-200 transition-colors text-sm"
-            >
-              Draw Route
-            </button>
-            <button 
-              onClick={handleClearRoutes}
-              className="bg-red-500/20 text-red-400 border border-red-500/50 font-semibold px-4 py-2 rounded hover:bg-red-500/30 transition-colors text-sm"
-            >
-              Clear
-            </button>
-          </div>
+        <div className="flex flex-col items-center justify-center gap-4 max-w-fit mx-auto relative z-20">
+          <RoutePlanner onDrawRoute={handleDrawRoute} onClearRoutes={handleClearRoutes} />
         </div>
 
         {/* Sliders */}
