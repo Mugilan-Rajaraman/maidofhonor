@@ -8,7 +8,7 @@ import ConicPolygonGeometry from 'three-conic-polygon-geometry';
 interface GeoJSONFeature {
   geometry: {
     type: 'Polygon' | 'MultiPolygon' | 'LineString' | 'MultiLineString';
-    coordinates: any; 
+    coordinates: any;
   };
 }
 
@@ -110,12 +110,12 @@ export default function ThreeJSGlobeWithDots({
       .then(res => res.json())
       .then(geoJson => {
         const continentMat = new THREE.LineBasicMaterial({ color: '#ffffff', opacity: 0.85, transparent: true });
-        const fillMat = new THREE.MeshBasicMaterial({ 
+        const fillMat = new THREE.MeshBasicMaterial({
           color: '#1a1a1a', // Dark opaque color
-          opacity: 1, 
-          transparent: false, 
-          depthWrite: true, 
-          side: THREE.DoubleSide 
+          opacity: 1,
+          transparent: false,
+          depthWrite: true,
+          side: THREE.DoubleSide
         });
 
         geoJson.features.forEach((feature: GeoJSONFeature) => {
@@ -158,7 +158,7 @@ export default function ThreeJSGlobeWithDots({
     // 5. Dynamic States Rendering Variables
     const stateMat = new THREE.LineBasicMaterial({ color: '#ffffff', opacity: 0, transparent: true });
     statesMaterialRef = stateMat;
-    
+
     let currentFocusedCountry: string | null = null;
     const statesCache = new Map<string, THREE.Vector3[]>();
     let isFetchingStates = false;
@@ -192,7 +192,7 @@ export default function ThreeJSGlobeWithDots({
                   const phi2 = (90 - lat2) * Math.PI / 180;
                   const theta2 = (90 - lon2) * Math.PI / 180;
 
-                  const rOutline = R + 0.016; 
+                  const rOutline = R + 0.016;
 
                   allStatePoints!.push(
                     new THREE.Vector3(
@@ -297,11 +297,11 @@ export default function ThreeJSGlobeWithDots({
         raycaster.setFromCamera(screenCenter, camera);
         const intersects = raycaster.intersectObject(globeGroup, true);
         const countryHit = intersects.find(hit => hit.object.userData && hit.object.userData.countryCode);
-        
+
         if (countryHit) {
           const hitCountryCode = countryHit.object.userData.countryCode;
           if (hitCountryCode !== currentFocusedCountry) {
-             loadCountryStates(hitCountryCode);
+            loadCountryStates(hitCountryCode);
           }
         }
       }
@@ -311,8 +311,8 @@ export default function ThreeJSGlobeWithDots({
       if (statesMaterialRef) {
         if (distance < STATE_THRESHOLD) {
           statesGroup.visible = true;
-          // Target max opacity 0.3
-          const targetOpacity = Math.min(0.3, Math.max(0, (STATE_THRESHOLD - distance) / 0.5 * 0.3));
+          // Target max opacity 1.0
+          const targetOpacity = Math.min(1.0, Math.max(0, (STATE_THRESHOLD - distance) / 1.0));
           statesMaterialRef.opacity += (targetOpacity - statesMaterialRef.opacity) * 0.1;
         } else {
           statesMaterialRef.opacity += (0 - statesMaterialRef.opacity) * 0.1;
