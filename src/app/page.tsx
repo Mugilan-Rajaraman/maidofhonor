@@ -23,58 +23,68 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-black flex flex-col items-center justify-center p-8 font-[family-name:var(--font-geist-sans)]">
-      <div className="w-full max-w-6xl text-center space-y-8">
-        <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white">
-          Active Global Network
-        </h1>
-        <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-          Monitoring persona reactions in real-time across all active zones.
-        </p>
+    <main className="relative w-screen h-screen overflow-hidden bg-[#0a0a0a] font-[family-name:var(--font-geist-sans)] text-white">
+      {/* 3D Map Background */}
+      <div className="absolute inset-0 z-0">
+        <ThreeJSGlobeWithDots 
+          routes={routes} 
+          arcHeightMultiplier={arcHeight} 
+          routeThickness={routeThickness} 
+        />
+      </div>
 
-        {/* Route Controls */}
-        <div className="flex flex-col items-center justify-center gap-4 max-w-fit mx-auto relative z-20">
-          <RoutePlanner onDrawRoute={handleDrawRoute} onClearRoutes={handleClearRoutes} />
-        </div>
-
-        {/* Sliders */}
-        <div className="flex flex-col md:flex-row flex-wrap items-center justify-center gap-6 bg-white/5 p-4 rounded-xl border border-white/10 max-w-fit mx-auto">
-          <div className="flex items-center gap-4">
-            <span className="text-white/70 text-sm">Arc Height:</span>
-            <input 
-              type="range" 
-              min="0.01" 
-              max="1.5" 
-              step="0.05"
-              value={arcHeight}
-              onChange={(e) => setArcHeight(parseFloat(e.target.value))}
-              className="w-24 accent-cyan-400"
-            />
-            <span className="text-white/70 text-sm w-8">{arcHeight.toFixed(2)}x</span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <span className="text-white/70 text-sm">Thickness:</span>
-            <input 
-              type="range" 
-              min="0.001" 
-              max="0.03" 
-              step="0.001"
-              value={routeThickness}
-              onChange={(e) => setRouteThickness(parseFloat(e.target.value))}
-              className="w-24 accent-cyan-400"
-            />
-            <span className="text-white/70 text-sm w-10">{routeThickness.toFixed(3)}</span>
-          </div>
-        </div>
+      {/* Foreground UI Layer */}
+      <div className="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-6">
         
-        <div className="w-full relative mt-4 p-[1px] rounded-[1.5rem] bg-gradient-to-b from-white/10 to-transparent">
-          <ThreeJSGlobeWithDots 
-            routes={routes} 
-            arcHeightMultiplier={arcHeight} 
-            routeThickness={routeThickness} 
-          />
+        {/* Top Header & Route Planner Area */}
+        <div className="flex justify-between items-start">
+          {/* Route Planner */}
+          <div className="pointer-events-auto">
+            <RoutePlanner onDrawRoute={handleDrawRoute} onClearRoutes={handleClearRoutes} />
+          </div>
+
+          {/* Title Area */}
+          <div className="text-right pointer-events-auto bg-black/40 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+            <h1 className="text-3xl font-bold tracking-tight">Active Global Network</h1>
+            <p className="text-white/50 text-sm mt-1">Real-time geospatial route monitoring</p>
+          </div>
         </div>
+
+        {/* Bottom Area (Sliders) */}
+        <div className="flex justify-end pointer-events-auto">
+          <div className="flex items-center gap-6 bg-black/60 backdrop-blur-xl p-4 rounded-2xl border border-white/10 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <span className="text-white/70 text-xs uppercase tracking-wider font-semibold">Arc Height</span>
+              <input 
+                type="range" 
+                min="0.01" 
+                max="1.5" 
+                step="0.05"
+                value={arcHeight}
+                onChange={(e) => setArcHeight(parseFloat(e.target.value))}
+                className="w-24 accent-cyan-400"
+              />
+              <span className="text-cyan-400 text-xs font-mono w-8">{arcHeight.toFixed(2)}x</span>
+            </div>
+
+            <div className="w-px h-6 bg-white/10" />
+
+            <div className="flex items-center gap-3">
+              <span className="text-white/70 text-xs uppercase tracking-wider font-semibold">Thickness</span>
+              <input 
+                type="range" 
+                min="0.001" 
+                max="0.03" 
+                step="0.001"
+                value={routeThickness}
+                onChange={(e) => setRouteThickness(parseFloat(e.target.value))}
+                className="w-24 accent-cyan-400"
+              />
+              <span className="text-cyan-400 text-xs font-mono w-10">{routeThickness.toFixed(3)}</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </main>
   );

@@ -12,13 +12,6 @@ interface GeoJSONFeature {
   };
 }
 
-interface Dot {
-  id: string;
-  lat: number;
-  lon: number;
-  state: 'initial' | 'attention' | 'partial' | 'ignore';
-}
-
 interface GlobeRoute {
   lat1: number;
   lon1: number;
@@ -32,37 +25,16 @@ interface GlobeProps {
   routeThickness?: number;
 }
 
-const COLOR_MAP = {
-  initial: '#666666',
-  attention: '#00ff00',
-  partial: '#ffff00',
-  ignore: '#ff0000',
-};
-
-const SIZE_MAP = {
-  initial: 4,
-  attention: 8,
-  partial: 8,
-  ignore: 8,
-};
-
 export default function ThreeJSGlobeWithDots({
   routes = [],
   arcHeightMultiplier = 0.4,
   routeThickness = 0.005
 }: GlobeProps) {
   const mountRef = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const dotElementsRef = useRef<Record<string, HTMLDivElement | null>>({});
   const globeGroupRef = useRef<THREE.Group | null>(null);
 
-  const [dots, setDots] = useState<Dot[]>([]);
-
-  // To keep track of the dots' corresponding 3D meshes without re-running useEffect
-  const dotMeshesRef = useRef<Record<string, THREE.Mesh>>({});
-
   useEffect(() => {
-    if (!mountRef.current || !overlayRef.current) return;
+    if (!mountRef.current) return;
 
     const width = mountRef.current.clientWidth;
     const height = mountRef.current.clientHeight;
@@ -170,35 +142,7 @@ export default function ThreeJSGlobeWithDots({
       })
       .catch(err => console.error("Error loading continents:", err));
 
-    // 5. Persona dots setup
-    const initialDots: Dot[] = Array.from({ length: 40 }).map((_, i) => ({
-      id: `dot-${i}`,
-      lat: (Math.random() - 0.5) * 140, // Avoid poles
-      lon: (Math.random() - 0.5) * 360,
-      state: 'initial'
-    }));
-
-    setDots(initialDots);
-
-    const dotGeo = new THREE.SphereGeometry(0.015, 8, 8);
-
-    initialDots.forEach(dot => {
-      const phi = (90 - dot.lat) * Math.PI / 180;
-      const theta = (90 - dot.lon) * Math.PI / 180;
-      const r = R + 0.02;
-
-      const mat = new THREE.MeshBasicMaterial({ color: COLOR_MAP[dot.state] });
-      const mesh = new THREE.Mesh(dotGeo, mat);
-
-      mesh.position.set(
-        r * Math.sin(phi) * Math.cos(theta),
-        r * Math.cos(phi),
-        r * Math.sin(phi) * Math.sin(theta)
-      );
-
-      globeGroup.add(mesh);
-      dotMeshesRef.current[dot.id] = mesh;
-    });
+    // Persona dots setup removed
 
     // 7. Globe group rotation & animate loop
     let animationFrameId: number;
@@ -212,40 +156,6 @@ export default function ThreeJSGlobeWithDots({
         globeGroup.rotation.y += 0.003;
       }
 
-      // 6. Dot visibility & screen positioning
-      const globeCenter = new THREE.Vector3(0, 0, 0);
-      globeCenter.applyMatrix4(globeGroup.matrixWorld);
-
-      Object.keys(dotMeshesRef.current).forEach(id => {
-        const mesh = dotMeshesRef.current[id];
-        const worldPos = new THREE.Vector3();
-        mesh.getWorldPosition(worldPos);
-
-        const distToCenter = camera.position.distanceTo(globeCenter);
-        const distToDot = camera.position.distanceTo(worldPos);
-
-        // Hide if further than center
-        const isVisible = distToDot <= distToCenter;
-
-        const el = dotElementsRef.current[id];
-        if (el) {
-          if (isVisible) {
-            const screenPos = worldPos.clone().project(camera);
-
-            // Need bounding rect of the container to position correctly
-            if (mountRef.current) {
-              const rect = mountRef.current.getBoundingClientRect();
-              const x = (screenPos.x * 0.5 + 0.5) * rect.width;
-              const y = (-(screenPos.y * 0.5) + 0.5) * rect.height;
-
-              el.style.display = 'block';
-              el.style.transform = `translate(-50%, -50%) translate3d(${x}px, ${y}px, 0)`;
-            }
-          } else {
-            el.style.display = 'none';
-          }
-        }
-      });
 
       renderer.render(scene, camera);
     };
@@ -341,63 +251,10 @@ export default function ThreeJSGlobeWithDots({
 
   }, [routes, arcHeightMultiplier, routeThickness]);
 
-  // Simulate reactions arriving
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDots(prev => {
-        const newDots = [...prev];
-        const randomIdx = Math.floor(Math.random() * newDots.length);
-        const states: Dot['state'][] = ['attention', 'partial', 'ignore'];
-        const newState = states[Math.floor(Math.random() * states.length)];
-
-        newDots[randomIdx] = { ...newDots[randomIdx], state: newState };
-
-        // Also update 3D mesh material
-        const mesh = dotMeshesRef.current[newDots[randomIdx].id];
-        if (mesh) {
-          (mesh.material as THREE.MeshBasicMaterial).color.set(COLOR_MAP[newState]);
-        }
-
-        return newDots;
-      });
-    }, 2000); // Simulate an update every 2 seconds
-
-    return () => clearInterval(interval);
-  }, []);
 
   return (
-    <div className="relative w-full h-full min-h-[600px] flex items-center justify-center bg-[#0a0a0a] rounded-3xl overflow-hidden shadow-2xl">
+    <div className="relative w-full h-full bg-[#0a0a0a] overflow-hidden">
       <div ref={mountRef} className="absolute inset-0 cursor-grab active:cursor-grabbing" />
-
-      <div ref={overlayRef} className="absolute inset-0 pointer-events-none">
-        {dots.map(dot => {
-          const size = SIZE_MAP[dot.state];
-          const color = COLOR_MAP[dot.state];
-          const isPulsing = dot.state !== 'initial';
-
-          return (
-            <div
-              key={dot.id}
-              ref={el => { dotElementsRef.current[dot.id] = el; }}
-              className="absolute top-0 left-0 hidden"
-              style={{ width: size, height: size }}
-            >
-              {/* Outer pulsing ring */}
-              {isPulsing && (
-                <div
-                  className="absolute inset-0 rounded-full animate-ping opacity-75"
-                  style={{ backgroundColor: color }}
-                />
-              )}
-              {/* Inner core dot */}
-              <div
-                className="absolute inset-0 rounded-full transition-colors duration-500"
-                style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }}
-              />
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
