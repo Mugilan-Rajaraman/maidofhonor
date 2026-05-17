@@ -7,8 +7,8 @@ import ConicPolygonGeometry from 'three-conic-polygon-geometry';
 
 interface GeoJSONFeature {
   geometry: {
-    type: 'Polygon' | 'MultiPolygon';
-    coordinates: any; // handles both Polygon and MultiPolygon
+    type: 'Polygon' | 'MultiPolygon' | 'LineString' | 'MultiLineString';
+    coordinates: any; 
   };
 }
 
@@ -81,6 +81,18 @@ export default function ThreeJSGlobeWithDots({
     scene.add(globeGroup);
     globeGroupRef.current = globeGroup;
 
+    // Groups for zooming elements
+    const statesGroup = new THREE.Group();
+    statesGroup.visible = false;
+    globeGroup.add(statesGroup);
+
+    const citiesGroup = new THREE.Group();
+    citiesGroup.visible = false;
+    globeGroup.add(citiesGroup);
+
+    let statesMaterialRef: THREE.LineBasicMaterial | null = null;
+    let citiesMaterialRef: THREE.PointsMaterial | null = null;
+
     // 2. Wireframe sphere (using Icosahedron for the triangular geodesic look)
     const R = 1.3;
     const sphereGeo = new THREE.IcosahedronGeometry(R, 40);
@@ -113,9 +125,10 @@ export default function ThreeJSGlobeWithDots({
 
           polygons.forEach((polygon: number[][][]) => {
             // Fill using ConicPolygonGeometry
-            // (polygonGeoJson, bottomHeight, topHeight, closedBottom, closedTop, includeSides, curvatureResolution)
             const conicGeo = new ConicPolygonGeometry(polygon, R, R + 0.015, false, true, false, 5);
             const fillMesh = new THREE.Mesh(conicGeo, fillMat);
+            // Attach ADM0_A3 for raycasting focus detection
+            fillMesh.userData = { countryCode: feature.properties?.ADM0_A3 };
             globeGroup.add(fillMesh);
 
             // Outlines
@@ -142,10 +155,131 @@ export default function ThreeJSGlobeWithDots({
       })
       .catch(err => console.error("Error loading continents:", err));
 
+    // 5. Dynamic States Rendering Variables
+    const stateMat = new THREE.LineBasicMaterial({ color: '#ffffff', opacity: 0, transparent: true });
+    statesMaterialRef = stateMat;
+    
+    let currentFocusedCountry: string | null = null;
+    const statesCache = new Map<string, THREE.Vector3[]>();
+    let isFetchingStates = false;
+
+    const loadCountryStates = async (countryCode: string) => {
+      if (isFetchingStates || !countryCode) return;
+      currentFocusedCountry = countryCode;
+
+      let allStatePoints = statesCache.get(countryCode);
+
+      if (!allStatePoints) {
+        isFetchingStates = true;
+        try {
+          const res = await fetch(`/api/states?country=${countryCode}`);
+          const geoJson = await res.json();
+          allStatePoints = [];
+
+          if (geoJson.features) {
+            geoJson.features.forEach((feature: GeoJSONFeature) => {
+              if (!feature.geometry) return;
+              const type = feature.geometry.type;
+              const coords = type === 'MultiLineString' ? feature.geometry.coordinates : (type === 'LineString' ? [feature.geometry.coordinates] : []);
+
+              coords.forEach((lineString: number[][]) => {
+                for (let i = 0; i < lineString.length - 1; i++) {
+                  const [lon1, lat1] = lineString[i];
+                  const [lon2, lat2] = lineString[i + 1];
+
+                  const phi1 = (90 - lat1) * Math.PI / 180;
+                  const theta1 = (90 - lon1) * Math.PI / 180;
+                  const phi2 = (90 - lat2) * Math.PI / 180;
+                  const theta2 = (90 - lon2) * Math.PI / 180;
+
+                  const rOutline = R + 0.016; 
+
+                  allStatePoints!.push(
+                    new THREE.Vector3(
+                      rOutline * Math.sin(phi1) * Math.cos(theta1),
+                      rOutline * Math.cos(phi1),
+                      rOutline * Math.sin(phi1) * Math.sin(theta1)
+                    ),
+                    new THREE.Vector3(
+                      rOutline * Math.sin(phi2) * Math.cos(theta2),
+                      rOutline * Math.cos(phi2),
+                      rOutline * Math.sin(phi2) * Math.sin(theta2)
+                    )
+                  );
+                }
+              });
+            });
+          }
+          statesCache.set(countryCode, allStatePoints);
+        } catch (err) {
+          console.error("Error loading states for", countryCode, err);
+        } finally {
+          isFetchingStates = false;
+        }
+      }
+
+      // If user zoomed out or changed focus quickly, abort updating
+      if (currentFocusedCountry !== countryCode) return;
+
+      // Update the states mesh
+      while (statesGroup.children.length > 0) {
+        const child = statesGroup.children[0] as THREE.LineSegments;
+        statesGroup.remove(child);
+        if (child.geometry) child.geometry.dispose();
+      }
+
+      if (allStatePoints && allStatePoints.length > 0) {
+        const mergedGeo = new THREE.BufferGeometry().setFromPoints(allStatePoints);
+        const mergedLines = new THREE.LineSegments(mergedGeo, stateMat);
+        statesGroup.add(mergedLines);
+      }
+    };
+
+    // 6. Cities data (Points)
+    fetch('/cities_lite.json')
+      .then(res => res.json())
+      .then((cities: number[][]) => {
+        const vertices = [];
+        for (let i = 0; i < cities.length; i++) {
+          const [lat, lon] = cities[i];
+          const phi = (90 - lat) * Math.PI / 180;
+          const theta = (90 - lon) * Math.PI / 180;
+          const rCity = R + 0.017;
+          vertices.push(
+            rCity * Math.sin(phi) * Math.cos(theta),
+            rCity * Math.cos(phi),
+            rCity * Math.sin(phi) * Math.sin(theta)
+          );
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+
+        const material = new THREE.PointsMaterial({
+          color: '#00ffff',
+          size: 0.005,
+          transparent: true,
+          opacity: 0,
+          sizeAttenuation: true
+        });
+        citiesMaterialRef = material;
+
+        const pointsMesh = new THREE.Points(geometry, material);
+        citiesGroup.add(pointsMesh);
+      })
+      .catch(err => console.error("Error loading cities:", err));
+
     // Persona dots setup removed
 
     // 7. Globe group rotation & animate loop
     let animationFrameId: number;
+
+    const STATE_THRESHOLD = 4.0;
+    const CITY_THRESHOLD = 2.8;
+
+    const raycaster = new THREE.Raycaster();
+    const screenCenter = new THREE.Vector2(0, 0);
+    let frameCount = 0;
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
@@ -156,6 +290,48 @@ export default function ThreeJSGlobeWithDots({
         globeGroup.rotation.y += 0.003;
       }
 
+      const distance = camera.position.length();
+
+      // Focus Country Raycasting (every 10 frames to save CPU)
+      if (distance < STATE_THRESHOLD && frameCount % 10 === 0) {
+        raycaster.setFromCamera(screenCenter, camera);
+        const intersects = raycaster.intersectObject(globeGroup, true);
+        const countryHit = intersects.find(hit => hit.object.userData && hit.object.userData.countryCode);
+        
+        if (countryHit) {
+          const hitCountryCode = countryHit.object.userData.countryCode;
+          if (hitCountryCode !== currentFocusedCountry) {
+             loadCountryStates(hitCountryCode);
+          }
+        }
+      }
+      frameCount++;
+
+      // Fade states
+      if (statesMaterialRef) {
+        if (distance < STATE_THRESHOLD) {
+          statesGroup.visible = true;
+          // Target max opacity 0.3
+          const targetOpacity = Math.min(0.3, Math.max(0, (STATE_THRESHOLD - distance) / 0.5 * 0.3));
+          statesMaterialRef.opacity += (targetOpacity - statesMaterialRef.opacity) * 0.1;
+        } else {
+          statesMaterialRef.opacity += (0 - statesMaterialRef.opacity) * 0.1;
+          if (statesMaterialRef.opacity < 0.01) statesGroup.visible = false;
+        }
+      }
+
+      // Fade cities
+      if (citiesMaterialRef) {
+        if (distance < CITY_THRESHOLD) {
+          citiesGroup.visible = true;
+          // Target max opacity 0.6
+          const targetOpacity = Math.min(0.6, Math.max(0, (CITY_THRESHOLD - distance) / 0.5 * 0.6));
+          citiesMaterialRef.opacity += (targetOpacity - citiesMaterialRef.opacity) * 0.1;
+        } else {
+          citiesMaterialRef.opacity += (0 - citiesMaterialRef.opacity) * 0.1;
+          if (citiesMaterialRef.opacity < 0.01) citiesGroup.visible = false;
+        }
+      }
 
       renderer.render(scene, camera);
     };
